@@ -51,12 +51,11 @@ async def shutdown():
     print('shutdown')
     ydb_driver.close()
 
-def insertPhotoToDb(original_id, face_id):
-    rand = random.Random()
+def insertPhotoToDb(id, original_id, face_id):
     query = f"""
     PRAGMA TablePathPrefix("{config['DB_PATH']}");
     INSERT INTO photo (id, original_id, face_id)
-    VALUES ({rand.getrandbits(64)}, '{original_id}', '{face_id}');
+    VALUES ({id}, '{original_id}', '{face_id}');
     """
     print(f"Trying execute query: {query}")
     session = ydb_driver.table_client.session().create()
@@ -109,7 +108,7 @@ def handle(message):
     photo = Image.open(io.BytesIO(getPhoto(config['PHOTO_BUCKET'], body['object_key'])))
     face = body['face']
   
-    count = 0
+
     x = set()
     y = set()
   
@@ -124,16 +123,16 @@ def handle(message):
     right = sorted_x[1]
     top = sorted_y[0]
     bottom = sorted_y[1]
-  
-    face_id = f"{body['object_key'].removesuffix('.jpg')}_{count}.jpg"
+    
+    id = random.Random().getrandbits(64)
+    face_id = f"{body['object_key'].removesuffix('.jpg')}_{id}.jpg"
   
     cutFace = photo.crop((left, top, right, bottom))
     bytes = io.BytesIO()
     cutFace.save(bytes, format='JPEG')
     putPhoto(config['FACE_BUCKET'], face_id, bytes.getvalue())
-    count += 1
   
-    insertPhotoToDb(body['object_key'], face_id)
+    insertPhotoToDb(id, body['object_key'], face_id)
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ['PORT']), motd=False, access_log=False)
